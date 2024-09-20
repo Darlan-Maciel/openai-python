@@ -1,0 +1,60 @@
+import openai
+import docx
+import PyPDF2
+from PIL import Image
+import pytesseract
+import os
+
+def setup_openai_api():
+    """Configura o token de acesso da API do OpenAI."""
+    openai.api_key = 'your-api-key-here'
+
+def get_job_requirements():
+    """Obtém do usuário a descrição da vaga e os requisitos necessários."""
+    job_title = input("Digite o título da vaga: ")
+    job_description = input("Digite a descrição da vaga: ")
+    job_requirements = input("Digite os pré-requisitos para a vaga: ")
+    return job_title, job_description, job_requirements
+
+def read_file(file_path):
+    """Lê o conteúdo do arquivo com base no seu formato."""
+    ext = os.path.splitext(file_path)[-1].lower()
+    text = ""
+    if ext in ['.txt']:
+        with open(file_path, 'r', encoding='utf-8') as file:
+            text = file.read()
+    elif ext in ['.doc', '.docx']:
+        doc = docx.Document(file_path)
+        text = '\n'.join([para.text for para in doc.paragraphs])
+    elif ext in ['.pdf']:
+        with open(file_path, 'rb') as file:
+            pdf = PyPDF2.PdfReader(file)
+            for page in pdf.pages:
+                text += page.extract_text()
+    elif ext in ['.jpg', '.jpeg', '.png']:
+        text = pytesseract.image_to_string(Image.open(file_path))
+    return text
+
+def query_gpt(job_description, job_requirements, resume_text):
+    """Envia uma consulta para o GPT com base na descrição, requisitos da vaga e texto do currículo."""
+    try:
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=f"Vaga: {job_description}\nRequisitos: {job_requirements}\nCurrículo: {resume_text}\n\nAvaliar se o currículo atende aos requisitos para a vaga. Responder com 'Pré selecionado para entrevista' ou 'Não atende aos requisitos':",
+            max_tokens=60
+        )
+        return response.choices[0].text.strip()
+    except Exception as e:
+        return f"Erro ao analisar currículo: {str(e)}"
+
+def main():
+    setup_openai_api()
+    job_title, job_description, job_requirements = get_job_requirements()
+    file_path = input("Por favor, anexe o arquivo do currículo: ")
+    resume_text = read_file(file_path)
+    result = query_gpt(job_description, job_requirements, resume_text)
+    print("\nResultado da Avaliação do Currículo:")
+    print(result)
+
+if __name__ == "__main__":
+    main()
